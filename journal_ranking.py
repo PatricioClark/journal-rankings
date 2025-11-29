@@ -29,17 +29,18 @@ def get_journal_categories(journal_name):
         
         # The search result list
         search_results = soup.find_all("div", class_="search_results")
+        search_results = search_results[0].find_all("a")
         
         journal_link = None
         real_title = None
         
-        # Loop to find the first valid journal link
+        # Loop to find the journal
         if search_results:
-            # Usually the first result is the best match
-            first_result = search_results[0].find("a")
-            if first_result:
-                journal_link = first_result['href']
-                real_title = first_result.find("span", class_="jrnlname").get_text(strip=True)
+            for result in search_results:
+                journal_link = result['href']
+                real_title = result.find("span", class_="jrnlname").get_text(strip=True)
+                if real_title.lower() == journal_name.lower():
+                    break
         
         if not journal_link:
             print("Journal not found.")
@@ -79,7 +80,10 @@ def get_journal_categories(journal_name):
             print(f"Category: {cat_name} (ID: {cat_id})")
             categories_data.append({"name": cat_name, "id": cat_id})
 
-        return {"journal": real_title, "categories": categories_data, "url": journal_link}
+        print(categories_data)
+        names = [category['name'] for category in categories_data]
+        idies = [category['id'] for category in categories_data]
+        return real_title, {"Category": names, "ids": idies}
 
     except Exception as e:
         print(f"Error: {e}")
@@ -125,19 +129,13 @@ def get_total_journals(soup):
 
     return None
 
-def get_total_journal_old(soup):
+def get_category_name(soup, category_id):
     """
-    Attempts to find the total number of journals in the category.
+    Get category name from page title
     """
-    # Strategy: Text search for "1 - ?? of 2300"
-    # This text often appears in the .journalrank-header or similar
-    body_text = soup.get_text()
-    # print(body_text)
-    match = re.search(r"1\s*-\s*\d\d\s*of\s*(\d+)", body_text)
-    if match:
-        return int(match.group(1))
-
-    return None
+    page_title = soup.title.get_text(strip=True) if soup.title else ""
+    cat_name = page_title.replace('Journal Rankings on', '')
+    return cat_name
 
 def get_scimago_ranking(journal_name, category_id, year):
     """
@@ -178,6 +176,9 @@ def get_scimago_ranking(journal_name, category_id, year):
             
             # SCImago tables are usually standard HTML tables
             table_rows = soup.find_all("tr")
+
+            # Get category name
+            category_name = get_category_name(soup, category_id)
             
             # If no rows (except header), we've reached the end
             if len(table_rows) <= 1: 
@@ -204,13 +205,17 @@ def get_scimago_ranking(journal_name, category_id, year):
                                 quartile = q_class.upper()
                                 break
                         
+                        if year == '':
+                            year = datetime.now().year
+                        # One of the entries is a list so the dataframe is
+                        # displayed more nicely
                         return {
                             "Journal": curr_journal_title,
-                            "Rank": rank,
-                            "Number journals": number_journals,
+                            "Category name": [category_name],
+                            "Category Rank": f'#{rank} of {number_journals}',
+                            "Percentile": f'{100*int(rank)/number_journals:.2f}%',
                             "Quartile": quartile,
-                            "Category ID": category_id,
-                            "Page Found": page
+                            "Year": year,
                         }
             
             # Check if there is a 'Next' button to continue; otherwise, safety break
@@ -262,8 +267,8 @@ if __name__ == "__main__":
     if result:
         print("\n--- Result Found ---")
         print(f"Journal: {result['Journal']}")
-        print(f"Category Rank: #{result['Rank']} of {result['Number journals']}")
-        print(f"Percentile: {100*int(result['Rank'])/result['Number journals']:.2f}%")
+        print(f"Category Rank: {result['Category Rank']}")
+        print(f"Percentile: {result['Percentile']}")
         print(f"Quartile: {result['Quartile']}")
     else:
         print("\nJournal not found in this category.")
