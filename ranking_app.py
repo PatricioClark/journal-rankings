@@ -33,17 +33,19 @@ def get_journal_categories(journal_name):
         
         # The search result list
         search_results = soup.find_all("div", class_="search_results")
+        search_results = search_results[0].find_all("a")
         
         journal_link = None
         real_title = None
         
-        # Loop to find the first valid journal link
+        # Loop to find the journal
+        print(search_results)
         if search_results:
-            # Usually the first result is the best match
-            first_result = search_results[0].find("a")
-            if first_result:
-                journal_link = first_result['href']
-                real_title = first_result.find("span", class_="jrnlname").get_text(strip=True)
+            for result in search_results:
+                journal_link = result['href']
+                real_title = result.find("span", class_="jrnlname").get_text(strip=True)
+                if real_title.lower() == journal_name.lower():
+                    break
         
         if not journal_link:
             print("Journal not found.")
